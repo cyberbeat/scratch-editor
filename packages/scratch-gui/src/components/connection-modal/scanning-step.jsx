@@ -15,130 +15,170 @@ import warningIcon from './icons/warning.svg';
 
 import styles from './connection-modal.css';
 
-const ScanningStep = props => {
-    const showUpdate = !!(props.onUpdatePeripheral && !props.scanning);
-    return (<Box className={styles.body}>
-        <Box className={styles.activityArea}>
-            {props.scanning ? (
-                props.peripheralList.length === 0 ? (
-                    <div className={styles.activityAreaInfo}>
-                        <div className={styles.centeredRow}>
-                            <img
-                                className={classNames(styles.radarSmall, styles.radarSpin)}
-                                src={radarIcon}
-                            />
-                            <FormattedMessage
-                                defaultMessage="Looking for devices"
-                                description="Text shown while scanning for devices"
-                                id="gui.connection.scanning.lookingforperipherals"
-                            />
-                        </div>
-                    </div>
-                ) : (
+const ScanningStep = ({
+    connectedDevices,
+    connectingDevices,
+    connectionSmallIconURL,
+    multipleDevices,
+    onConnecting,
+    onPeripheralToggle,
+    onRefresh,
+    onUpdatePeripheral,
+    peripheralList,
+    scanning
+}) => {
+    const showUpdate = Boolean(onUpdatePeripheral && !scanning);
+    const hasDevices = peripheralList.length > 0;
+
+    return (
+        <Box className={styles.body}>
+            <Box className={styles.activityArea}>
+                {hasDevices ? (
                     <div className={styles.peripheralTilePane}>
-                        {props.peripheralList.map(peripheral =>
-                            (<PeripheralTile
-                                connectionSmallIconURL={props.connectionSmallIconURL}
+                        {peripheralList.map(peripheral => (
+                            <PeripheralTile
+                                connectionSmallIconURL={connectionSmallIconURL}
                                 key={peripheral.peripheralId}
+                                multipleDevices={multipleDevices}
                                 name={peripheral.name}
+                                onConnecting={onConnecting}
+                                onPeripheralToggle={onPeripheralToggle}
                                 peripheralId={peripheral.peripheralId}
                                 rssi={peripheral.rssi}
-                                onConnecting={props.onConnecting}
-                            />)
-                        )}
+                                status={
+                                    (connectedDevices && connectedDevices.includes(peripheral.peripheralId)) ?
+                                        'connected' :
+                                        ((connectingDevices && connectingDevices.includes(peripheral.peripheralId)) ?
+                                            'connecting' :
+                                            'available')
+                                }
+                            />
+                        ))}
                     </div>
-                )
-            ) : (
-                <Box className={styles.centeredRow}>
-                    <img
-                        className={styles.helpStepImage}
-                        src={warningIcon}
-                    />
-                    <FormattedMessage
-                        className={styles.helpStepText}
-                        defaultMessage="No devices found"
-                        description="Text shown when no devices could be found"
-                        id="gui.connection.scanning.noPeripheralsFound"
-                    />
-                </Box>
-            )}
-        </Box>
-        <Box className={styles.bottomArea}>
-            <Box className={classNames(styles.bottomAreaItem, styles.instructions)}>
-                {(props.scanning || props.peripheralList.length > 0) && (
-                    // Show this message if we're still scanning OR if we've found devices
-                    <FormattedMessage
-                        defaultMessage="Select your device in the list above."
-                        description="Prompt for choosing a device to connect to"
-                        id="gui.connection.scanning.instructions"
-                    />
-                )}
-                {showUpdate && (
-                    // Show this message if we're done scanning AND we can update
-                    // Note that it's possible the list includes devices but does not include the desired device,
-                    // so don't limit this message to the (props.peripheralList.length === 0) case
-                    <BalancedFormattedMessage
-                        defaultMessage="If you don't see your device, you may need to update it to work with Scratch."
-                        description="Prompt for updating a peripheral device"
-                        id="gui.connection.scanning.updatePeripheralPrompt"
-                    />
+                ) : (
+                    scanning ? (
+                        <div className={styles.activityAreaInfo}>
+                            <div className={styles.centeredRow}>
+                                <img
+                                    className={classNames(styles.radarSmall, styles.radarSpin)}
+                                    src={radarIcon}
+                                />
+                                <FormattedMessage
+                                    defaultMessage="Looking for devices"
+                                    description="Text shown while scanning for devices"
+                                    id="gui.connection.scanning.lookingforperipherals"
+                                />
+                            </div>
+                        </div>
+                    ) : (
+                        <Box className={styles.centeredRow}>
+                            <img
+                                className={styles.helpStepImage}
+                                src={warningIcon}
+                            />
+                            <FormattedMessage
+                                className={styles.helpStepText}
+                                defaultMessage="No devices found"
+                                description="Text shown when no devices could be found"
+                                id="gui.connection.scanning.noPeripheralsFound"
+                            />
+                        </Box>
+                    )
                 )}
             </Box>
-            <Dots
-                className={styles.bottomAreaItem}
-                counter={0}
-                total={3}
-            />
-            <Box className={classNames(styles.bottomAreaItem, styles.buttonRow)}>
-                <button
-                    className={styles.connectionButton}
-                    onClick={props.onRefresh}
-                >
-                    <FormattedMessage
-                        defaultMessage="Refresh"
-                        description="Button in prompt for starting a search"
-                        id="gui.connection.search"
-                    />
-                    <img
-                        className={styles.buttonIconRight}
-                        src={refreshIcon}
-                    />
-                </button>
-                {showUpdate && (
+
+            <Box className={styles.bottomArea}>
+                <Box className={classNames(styles.bottomAreaItem, styles.instructions)}>
+                    {(scanning || hasDevices) && (
+                        multipleDevices ? (
+                            <FormattedMessage
+                                defaultMessage="Click a device to connect it. Click 'Disconnect' to remove it."
+                                description="Prompt for connecting/disconnecting multiple devices"
+                                id="gui.connection.scanning.instructionsMultiple"
+                            />
+                        ) : (
+                            <FormattedMessage
+                                defaultMessage="Select your device in the list above."
+                                description="Prompt for choosing a single device to connect to"
+                                id="gui.connection.scanning.instructions"
+                            />
+                        )
+                    )}
+                    {showUpdate && (
+                        <BalancedFormattedMessage
+                            // eslint-disable-next-line max-len
+                            defaultMessage="If you don't see your device, you may need to update it to work with Scratch."
+                            description="Prompt for updating a peripheral device"
+                            id="gui.connection.scanning.updatePeripheralPrompt"
+                        />
+                    )}
+                </Box>
+
+                <Dots
+                    className={styles.bottomAreaItem}
+                    counter={0}
+                    total={3}
+                />
+
+                <Box className={classNames(styles.bottomAreaItem, styles.buttonRow)}>
                     <button
                         className={styles.connectionButton}
-                        onClick={props.onUpdatePeripheral}
+                        onClick={onRefresh}
                     >
                         <FormattedMessage
-                            defaultMessage="Update my Device"
-                            description="Button to enter the peripheral update mode"
-                            id="gui.connection.scanning.updatePeripheralButton"
+                            defaultMessage="Refresh"
+                            description="Button in prompt for starting a search"
+                            id="gui.connection.search"
                         />
                         <img
                             className={styles.buttonIconRight}
-                            src={enterUpdateIcon}
+                            src={refreshIcon}
                         />
                     </button>
-                )}
+
+                    {showUpdate && (
+                        <button
+                            className={styles.connectionButton}
+                            onClick={onUpdatePeripheral}
+                        >
+                            <FormattedMessage
+                                defaultMessage="Update my Device"
+                                description="Button to enter the peripheral update mode"
+                                id="gui.connection.scanning.updatePeripheralButton"
+                            />
+                            <img
+                                className={styles.buttonIconRight}
+                                src={enterUpdateIcon}
+                            />
+                        </button>
+                    )}
+                </Box>
             </Box>
         </Box>
-    </Box>);
+    );
 };
 
 ScanningStep.propTypes = {
+    connectedDevices: PropTypes.arrayOf(PropTypes.string),
+    connectingDevices: PropTypes.arrayOf(PropTypes.string),
     connectionSmallIconURL: PropTypes.string,
+    multipleDevices: PropTypes.bool,
     onConnecting: PropTypes.func,
+    onPeripheralToggle: PropTypes.func,
     onRefresh: PropTypes.func,
     onUpdatePeripheral: PropTypes.func,
     peripheralList: PropTypes.arrayOf(PropTypes.shape({
         name: PropTypes.string,
-        rssi: PropTypes.number,
-        peripheralId: PropTypes.string
+        peripheralId: PropTypes.string,
+        rssi: PropTypes.number
     })),
     scanning: PropTypes.bool.isRequired
 };
 
 ScanningStep.defaultProps = {
+    connectedDevices: [],
+    connectingDevices: [],
+    multipleDevices: false,
     peripheralList: [],
     scanning: true
 };

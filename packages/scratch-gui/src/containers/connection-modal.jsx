@@ -24,9 +24,13 @@ class ConnectionModal extends React.Component {
             'handleSendUpdate',
             'handleUpdatePeripheral'
         ]);
+        const extension = extensionData.find(ext => ext.extensionId === props.extensionId);
+        const multipleDevices = extension && extension.multipleDevices;
         this.state = {
-            extension: extensionData.find(ext => ext.extensionId === props.extensionId),
-            phase: props.vm.getPeripheralIsConnected(props.extensionId) ?
+            extension,
+            // Multi-device extensions manage their peripherals inside the scanning
+            // step, so always start there even if devices are already connected.
+            phase: (!multipleDevices && props.vm.getPeripheralIsConnected(props.extensionId)) ?
                 PHASES.connected : PHASES.scanning
         };
     }
@@ -62,9 +66,18 @@ class ConnectionModal extends React.Component {
         }
     }
     handleCancel () {
+        const multipleDevices = this.state.extension && this.state.extension.multipleDevices;
         try {
-            // If we're not connected to a peripheral, close the websocket so we stop scanning.
-            if (!this.props.vm.getPeripheralIsConnected(this.props.extensionId)) {
+            if (multipleDevices) {
+                // Keep connected hubs connected, but stop scanning.
+                if (this.props.vm.getPeripheralIsConnected(this.props.extensionId)) {
+                    this.props.vm.stopScanForPeripheral(this.props.extensionId);
+                } else {
+                    // Nothing connected: close the websocket so we stop scanning.
+                    this.props.vm.disconnectPeripheral(this.props.extensionId);
+                }
+            } else if (!this.props.vm.getPeripheralIsConnected(this.props.extensionId)) {
+                // If we're not connected to a peripheral, close the websocket so we stop scanning.
                 this.props.vm.disconnectPeripheral(this.props.extensionId);
             }
         } finally {
@@ -72,7 +85,14 @@ class ConnectionModal extends React.Component {
             this.props.onCancel();
         }
     }
-    handleError () {
+    handleError (data) {
+        const multipleDevices = this.state.extension && this.state.extension.multipleDevices;
+        // In multi-device mode an error for a specific device only resets that
+        // device's tile (handled by the scanning step); errors without a deviceId
+        // (e.g. scratch-link not running) still show the error/unavailable step.
+        if (multipleDevices && data && data.deviceId) {
+            return;
+        }
         // Assume errors that come in during scanning phase are the result of not
         // having scratch-link installed.
         if (this.state.phase === PHASES.scanning || this.state.phase === PHASES.unavailable) {
@@ -91,8 +111,11 @@ class ConnectionModal extends React.Component {
         }
     }
     handleConnected () {
+        const multipleDevices = this.state.extension && this.state.extension.multipleDevices;
+        // Multi-device extensions stay on the scanning step so further hubs can
+        // be connected/disconnected from the list.
         this.setState({
-            phase: PHASES.connected
+            phase: multipleDevices ? PHASES.scanning : PHASES.connected
         });
         analytics.event({
             category: 'extensions',
@@ -135,6 +158,7 @@ class ConnectionModal extends React.Component {
     }
     render () {
         const canUpdatePeripheral = (this.props.extensionId === 'microbit') && isMicroBitUpdateSupported();
+        const multipleDevices = this.state.extension && this.state.extension.multipleDevices;
         return (
             <ConnectionModalComponent
                 connectingMessage={this.state.extension && this.state.extension.connectingMessage}
@@ -149,6 +173,7 @@ class ConnectionModal extends React.Component {
                 title={this.props.extensionId}
                 useAutoScan={this.state.extension && this.state.extension.useAutoScan}
                 useExternalPeripheralList={this.props.useExternalPeripheralList}
+                multipleDevices={multipleDevices}
                 vm={this.props.vm}
                 onCancel={this.handleCancel}
                 onConnected={this.handleConnected}

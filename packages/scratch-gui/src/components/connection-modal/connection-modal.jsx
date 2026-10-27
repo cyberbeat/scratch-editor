@@ -65,6 +65,7 @@ ConnectionModalComponent.propTypes = {
     connectionIconURL: PropTypes.string,
     connectionSmallIconURL: PropTypes.string,
     connectionTipIconURL: PropTypes.string,
+    multipleDevices: PropTypes.bool,
     name: PropTypes.node,
     onCancel: PropTypes.func.isRequired,
     onHelp: PropTypes.func.isRequired,

@@ -18,6 +18,7 @@ const StageLayering = require('./stage-layering');
 const Variable = require('./variable');
 const xmlEscape = require('../util/xml-escape');
 const ScratchLinkWebSocket = require('../util/scratch-link-websocket');
+const WebBluetoothSocket = require('../util/web-bluetooth-socket');
 const fetchWithTimeout = require('../util/fetch-with-timeout');
 
 // Virtual I/O devices.
@@ -1508,7 +1509,16 @@ class Runtime extends EventEmitter {
         const ScratchLinkSafariSocket = Scratch && Scratch.ScratchLinkSafariSocket;
         // detect this every time in case the user turns on the extension after loading the page
         const useSafariSocket = ScratchLinkSafariSocket && ScratchLinkSafariSocket.isSafariHelperCompatible();
-        return useSafariSocket ? new ScratchLinkSafariSocket(type) : new ScratchLinkWebSocket(type);
+        if (useSafariSocket) {
+            return new ScratchLinkSafariSocket(type);
+        }
+        // Opt-in alternative transport: browser Web Bluetooth (?webbt or
+        // localStorage 'scratch-webbt'). Off by default because browsers
+        // without requestLEScan show an intrusive pairing dialog per scan.
+        if (type === 'BLE' && WebBluetoothSocket.isEnabled() && WebBluetoothSocket.isAvailable()) {
+            return new WebBluetoothSocket();
+        }
+        return new ScratchLinkWebSocket(type);
     }
 
     /**
@@ -1545,10 +1555,25 @@ class Runtime extends EventEmitter {
     /**
      * Disconnect from the extension's connected peripheral.
      * @param {string} extensionId - the id of the extension.
+     * @param {number|string} [peripheralId] - for extensions supporting multiple
+     *     peripherals: only disconnect this one peripheral. Extensions without
+     *     multi-peripheral support ignore this and disconnect as usual.
      */
-    disconnectPeripheral (extensionId) {
+    disconnectPeripheral (extensionId, peripheralId) {
         if (this.peripheralExtensions[extensionId]) {
-            this.peripheralExtensions[extensionId].disconnect();
+            this.peripheralExtensions[extensionId].disconnect(peripheralId);
+        }
+    }
+
+    /**
+     * Tell the specified extension to stop scanning for peripherals without
+     * disconnecting already connected peripherals (if supported).
+     * @param {string} extensionId - the id of the extension.
+     */
+    stopScanForPeripheral (extensionId) {
+        const extension = this.peripheralExtensions[extensionId];
+        if (extension && extension.stopScan) {
+            extension.stopScan();
         }
     }
 
@@ -1563,6 +1588,29 @@ class Runtime extends EventEmitter {
             isConnected = this.peripheralExtensions[extensionId].isConnected();
         }
         return isConnected;
+    }
+
+    /**
+     * Returns the IDs of the currently connected peripherals for an extension.
+     * @param {string} extensionId - the id of the extension.
+     * @returns {Array<string>} - the connected peripheral IDs.
+     */
+    getConnectedPeripherals (extensionId) {
+        if (this.peripheralExtensions[extensionId] && this.peripheralExtensions[extensionId].getConnectedPeripheralIds) {
+            return this.peripheralExtensions[extensionId].getConnectedPeripheralIds();
+        }
+        return [];
+    }
+
+    /**
+     * Ensures that exactly the given set of peripherals is connected for an extension.
+     * @param {string} extensionId - the id of the extension.
+     * @param {Array<string>} deviceIds - the ids of the peripherals to remain connected.
+     */
+    setConnectedPeripherals (extensionId, deviceIds) {
+        if (this.peripheralExtensions[extensionId] && this.peripheralExtensions[extensionId].setConnectedPeripheralIds) {
+            this.peripheralExtensions[extensionId].setConnectedPeripheralIds(deviceIds);
+        }
     }
 
     /**

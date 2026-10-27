@@ -102,11 +102,16 @@ AutoScanningStep.propTypes = {
     connectionIconURL: PropTypes.string,
     connectionTipIconURL: PropTypes.string,
     extensionId: PropTypes.string.isRequired,
+    multipleDevices: PropTypes.bool,
     onConnecting: PropTypes.func.isRequired,
     onUpdatePeripheral: PropTypes.func,
     prescanMessage: PropTypes.node,
     scanBeginMessage: PropTypes.node,
     vm: PropTypes.instanceOf(VM).isRequired
+};
+
+AutoScanningStep.defaultProps = {
+    multipleDevices: false
 };
 
 export default AutoScanningStep;
